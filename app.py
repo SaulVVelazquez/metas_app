@@ -272,3 +272,23 @@ def delete_meta(id: int):
     conn.commit()
     conn.close()
     return {"mensaje":"Eliminada"}
+@app.post("/login")
+def login(email: str, password: str):
+
+    conn = get_connection()
+    with conn.cursor() as cursor:
+        cursor.execute(
+            "SELECT id, nombre, rol FROM usuarios WHERE email=%s AND password=%s",
+            (email, password)
+        )
+        user = cursor.fetchone()
+
+    conn.close()
+
+    if not user:
+        raise HTTPException(status_code=401, detail="Credenciales incorrectas")
+
+    return {
+        "mensaje": "Login correcto",
+        "usuario": user
+    }
