@@ -1,8 +1,7 @@
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Literal
 import pymysql
 
 # ======================
@@ -40,7 +39,7 @@ class MetaIN(BaseModel):
     titulo: str
     descripcion: Optional[str] = None
     progreso: int = Field(ge=0, le=100)
-    estado: str
+    estado: Literal["pendiente","en progreso","completado"]
     fecha_inicio: Optional[str] = None
     fecha_limite: Optional[str] = None
 
@@ -48,23 +47,31 @@ class MetaUpdate(BaseModel):
     titulo: Optional[str] = None
     descripcion: Optional[str] = None
     progreso: Optional[int] = Field(default=None, ge=0, le=100)
-    estado: Optional[str] = None
+    estado: Optional[Literal["pendiente","en progreso","completado"]] = None
+
+class MetaDetalle(BaseModel):
+    id: int
+    titulo: str
+    progreso: int
+    usuario: str
+    categoria: Optional[str]
+
+class Login(BaseModel):
+    email: str
+    password: str
 
 # ======================
 # APP
 # ======================
 app = FastAPI(
     title="Metas API",
-    description="API sencilla para manejar metas personales pruebas",
+    description="API para gestión de metas personales",
     version="1.0"
 )
-origins = [
-    "http://localhost:8000",
-]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -101,7 +108,7 @@ def get_meta(id: int):
     conn.close()
 
     if not data:
-        return JSONResponse(status_code=404, content={"mensaje": "Meta no encontrada"})
+        raise HTTPException(status_code=404, detail="Meta no encontrada")
 
     return data
 
@@ -120,7 +127,7 @@ def get_metas_usuario(usuario_id: int):
 # ======================
 # JOIN DETALLE
 # ======================
-@app.get("/metas-detalle")
+@app.get("/metas-detalle", response_model=List[MetaDetalle])
 def get_metas_detalle():
     conn = get_connection()
     with conn.cursor() as cursor:
@@ -168,7 +175,7 @@ def create_meta(meta: MetaIN):
     return {"mensaje":"Meta creada"}
 
 # ======================
-# PUT (REEMPLAZO TOTAL)
+# PUT
 # ======================
 @app.put("/metas/{id}", response_model=Mensaje)
 def replace_meta(id: int, meta: MetaIN):
@@ -179,7 +186,7 @@ def replace_meta(id: int, meta: MetaIN):
         cursor.execute("SELECT * FROM metas WHERE id=%s",(id,))
         if not cursor.fetchone():
             conn.close()
-            return JSONResponse(status_code=404,content={"mensaje":"No existe"})
+            raise HTTPException(status_code=404, detail="No existe")
 
         estado = meta.estado
         if meta.progreso == 100:
@@ -226,7 +233,7 @@ def update_meta(id: int, meta: MetaUpdate):
 
         if not existing:
             conn.close()
-            return JSONResponse(status_code=404,content={"mensaje":"No existe"})
+            raise HTTPException(status_code=404, detail="No existe")
 
         update_data = meta.dict(exclude_unset=True)
 
@@ -265,21 +272,25 @@ def delete_meta(id: int):
         cursor.execute("SELECT id FROM metas WHERE id=%s",(id,))
         if not cursor.fetchone():
             conn.close()
-            return JSONResponse(status_code=404,content={"mensaje":"No existe"})
+            raise HTTPException(status_code=404, detail="No existe")
 
         cursor.execute("DELETE FROM metas WHERE id=%s",(id,))
 
     conn.commit()
     conn.close()
     return {"mensaje":"Eliminada"}
+
+# ======================
+# LOGIN
+# ======================
 @app.post("/login")
-def login(email: str, password: str):
+def login(data: Login):
 
     conn = get_connection()
     with conn.cursor() as cursor:
         cursor.execute(
             "SELECT id, nombre, rol FROM usuarios WHERE email=%s AND password=%s",
-            (email, password)
+            (data.email, data.password)
         )
         user = cursor.fetchone()
 
