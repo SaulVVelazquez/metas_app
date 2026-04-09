@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Optional, List, Literal
 import pymysql
+from datetime import date
 
 # ======================
 # CONEXION
@@ -30,8 +31,8 @@ class Meta(BaseModel):
     descripcion: Optional[str]
     progreso: int
     estado: str
-    fecha_inicio: Optional[str]
-    fecha_limite: Optional[str]
+    fecha_inicio: Optional[date]
+    fecha_limite: Optional[date]
 
 class MetaIN(BaseModel):
     usuario_id: int
