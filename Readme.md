@@ -206,7 +206,7 @@ curl -X POST http://localhost:8000/metas \
 
 ---
 
-## 🚀 Mejoras futuras
+## 🚀 Posibles mejoras futuras
 
 * Implementación de JWT
 * Hash de contraseñas
@@ -218,3 +218,22 @@ curl -X POST http://localhost:8000/metas \
 ## 📌 Notas
 
 Este proyecto fue desarrollado como parte de una prueba técnica para demostrar habilidades en desarrollo backend con FastAPI, bases de datos relacionales y diseño de APIs.
+
+##  Archivo de prueba de conexión
+
+El proyecto incluye un archivo adicional:
+
+```bash
+test.py
+```
+
+Este archivo se utilizó para verificar la conexión a la base de datos MySQL de forma independiente antes de integrar la lógica en la API.
+
+Permite validar:
+
+* Conexión correcta a la base de datos
+* Credenciales de acceso
+* Disponibilidad del servidor MySQL (XAMPP)
+
+Este archivo es útil durante el desarrollo para pruebas y depuración.
+
