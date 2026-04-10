@@ -209,7 +209,6 @@ curl -X POST http://localhost:8000/metas \
 ## 🚀 Posibles mejoras futuras
 
 * Implementación de JWT
-* Hash de contraseñas
 * Middleware de autenticación
 * Paginación de resultados
 

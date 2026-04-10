@@ -1,9 +1,11 @@
-from fastapi import FastAPI, HTTPException
+# 
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
-from typing import Optional, List, Literal
+from typing import Optional, Literal
 import pymysql
-from datetime import date
+import bcrypt
 
 # ======================
 # CONEXION
@@ -18,21 +20,40 @@ def get_connection():
     )
 
 # ======================
+# PASSWORD
+# ======================
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+
+def verify_password(password: str, hashed: str) -> bool:
+    try:
+        if not hashed:
+            return False
+
+        return bcrypt.checkpw(
+            password.encode("utf-8"),
+            hashed.encode("utf-8")
+        )
+    except Exception:
+        return False
+
+
+# ======================
 # MODELOS
 # ======================
-class Mensaje(BaseModel):
-    mensaje: str
+class UsuarioIN(BaseModel):
+    nombre: str
+    email: str
+    password: str
+    rol: Literal["admin", "user"]
 
-class Meta(BaseModel):
-    id: int
-    usuario_id: int
-    categoria_id: Optional[int]
-    titulo: str
-    descripcion: Optional[str]
-    progreso: int
-    estado: str
-    fecha_inicio: Optional[date]
-    fecha_limite: Optional[date]
+class Login(BaseModel):
+    email: str
+    password: str
+
+class CategoriaIN(BaseModel):
+    nombre: str
 
 class MetaIN(BaseModel):
     usuario_id: int
@@ -40,33 +61,17 @@ class MetaIN(BaseModel):
     titulo: str
     descripcion: Optional[str] = None
     progreso: int = Field(ge=0, le=100)
-    estado: Literal["pendiente","en progreso","completado"]
+    estado: Literal["pendiente", "en progreso", "completado"]
     fecha_inicio: Optional[str] = None
     fecha_limite: Optional[str] = None
 
-class MetaUpdate(BaseModel):
-    titulo: Optional[str] = None
-    descripcion: Optional[str] = None
-    progreso: Optional[int] = Field(default=None, ge=0, le=100)
-    estado: Optional[Literal["pendiente","en progreso","completado"]] = None
-
-class MetaDetalle(BaseModel):
-    id: int
-    titulo: str
-    progreso: int
-    usuario: str
-    categoria: Optional[str]
-
-class Login(BaseModel):
-    email: str
-    password: str
 
 # ======================
 # APP
 # ======================
 app = FastAPI(
-    title="Metas API",
-    description="API para gestión de metas personales",
+    title="API Metas",
+    description="Sistema con roles (admin / user) usando headers",
     version="1.0"
 )
 
@@ -78,6 +83,48 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+# ======================
+# MIDDLEWARE (FIXED)
+# ======================
+@app.middleware("http")
+async def auth(request: Request, call_next):
+
+    #   permitir CORS preflight
+    if request.method == "OPTIONS":
+        return await call_next(request)
+
+    rutas_publicas = [
+        "/", "/login", "/register",
+        "/docs", "/openapi.json"
+    ]
+
+    if request.url.path in rutas_publicas:
+        return await call_next(request)
+
+    user_id = request.headers.get("x-user-id")
+    rol = request.headers.get("x-rol")
+
+    # NO HTTPException en middleware
+    if not user_id or not rol:
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "Falta autenticación"}
+        )
+
+    try:
+        request.state.user_id = int(user_id)
+    except:
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "user_id inválido"}
+        )
+
+    request.state.rol = rol
+
+    return await call_next(request)
+
+
 # ======================
 # ROOT
 # ======================
@@ -85,70 +132,151 @@ app.add_middleware(
 def home():
     return {"mensaje": "API funcionando"}
 
+
 # ======================
-# GET TODAS
+# AUTH
 # ======================
-@app.get("/metas", response_model=List[Meta])
-def get_metas():
+@app.post("/register")
+def register(user: UsuarioIN):
+
     conn = get_connection()
     with conn.cursor() as cursor:
-        cursor.execute("SELECT * FROM metas")
-        data = cursor.fetchall()
-    conn.close()
-    return data
 
-# ======================
-# GET POR ID
-# ======================
-@app.get("/metas/{id}", response_model=Meta)
-def get_meta(id: int):
-    conn = get_connection()
-    with conn.cursor() as cursor:
-        cursor.execute("SELECT * FROM metas WHERE id=%s", (id,))
-        data = cursor.fetchone()
-    conn.close()
+        cursor.execute("SELECT id FROM usuarios WHERE email=%s", (user.email,))
+        if cursor.fetchone():
+            raise HTTPException(400, "Email ya registrado")
 
-    if not data:
-        raise HTTPException(status_code=404, detail="Meta no encontrada")
+        hashed = hash_password(user.password)
 
-    return data
-
-# ======================
-# GET POR USUARIO
-# ======================
-@app.get("/metas/usuario/{usuario_id}", response_model=List[Meta])
-def get_metas_usuario(usuario_id: int):
-    conn = get_connection()
-    with conn.cursor() as cursor:
-        cursor.execute("SELECT * FROM metas WHERE usuario_id=%s", (usuario_id,))
-        data = cursor.fetchall()
-    conn.close()
-    return data
-
-# ======================
-# JOIN DETALLE
-# ======================
-@app.get("/metas-detalle", response_model=List[MetaDetalle])
-def get_metas_detalle():
-    conn = get_connection()
-    with conn.cursor() as cursor:
         cursor.execute("""
-        SELECT m.id, m.titulo, m.progreso,
-               u.nombre AS usuario,
-               c.nombre AS categoria
-        FROM metas m
-        JOIN usuarios u ON m.usuario_id = u.id
-        LEFT JOIN categorias c ON m.categoria_id = c.id
-        """)
+            INSERT INTO usuarios (nombre, email, password, rol)
+            VALUES (%s,%s,%s,%s)
+        """, (user.nombre, user.email, hashed, user.rol))
+
+        conn.commit()
+
+    conn.close()
+    return {"mensaje": "Usuario creado"}
+
+
+@app.post("/login")
+def login(data: Login):
+
+    conn = get_connection()
+    with conn.cursor() as cursor:
+        cursor.execute("SELECT * FROM usuarios WHERE email=%s", (data.email,))
+        user = cursor.fetchone()
+
+    conn.close()
+
+    if not user:
+        raise HTTPException(401, "Credenciales incorrectas")
+
+    if not verify_password(data.password, user.get("password", "")):
+        raise HTTPException(401, "Credenciales incorrectas")
+
+    return {
+        "mensaje": "Login correcto",
+        "x-user-id": user["id"],
+        "x-rol": user["rol"],
+        "nombre": user["nombre"]
+    }
+
+
+# ======================
+# CATEGORIAS
+# ======================
+@app.get("/categorias")
+def get_categorias():
+
+    conn = get_connection()
+    with conn.cursor() as cursor:
+        cursor.execute("SELECT * FROM categorias")
         data = cursor.fetchall()
+
     conn.close()
     return data
 
+
+@app.post("/categorias")
+def create_categoria(cat: CategoriaIN, request: Request):
+
+    if request.state.rol != "admin":
+        raise HTTPException(403, "Solo admin")
+
+    conn = get_connection()
+    with conn.cursor() as cursor:
+        cursor.execute(
+            "INSERT INTO categorias (nombre) VALUES (%s)",
+            (cat.nombre,)
+        )
+
+    conn.commit()
+    conn.close()
+    return {"mensaje": "Categoría creada"}
+
+
 # ======================
-# POST
+# USUARIOS
 # ======================
-@app.post("/metas", response_model=Mensaje)
-def create_meta(meta: MetaIN):
+@app.get("/usuarios")
+def get_usuarios(request: Request):
+
+    if request.state.rol != "admin":
+        raise HTTPException(403, "Solo admin")
+
+    conn = get_connection()
+    with conn.cursor() as cursor:
+        cursor.execute("SELECT id,nombre,email,rol FROM usuarios")
+        data = cursor.fetchall()
+
+    conn.close()
+    return data
+
+
+@app.delete("/usuarios/{id}")
+def delete_usuario(id: int, request: Request):
+
+    if request.state.rol != "admin":
+        raise HTTPException(403, "Solo admin")
+
+    conn = get_connection()
+    with conn.cursor() as cursor:
+        cursor.execute("DELETE FROM usuarios WHERE id=%s", (id,))
+
+    conn.commit()
+    conn.close()
+    return {"mensaje": "Usuario eliminado"}
+
+
+# ======================
+# METAS
+# ======================
+@app.get("/metas")
+def get_metas(request: Request):
+
+    user_id = request.state.user_id
+    rol = request.state.rol
+
+    conn = get_connection()
+    with conn.cursor() as cursor:
+
+        if rol == "admin":
+            cursor.execute("SELECT * FROM metas")
+        else:
+            cursor.execute(
+                "SELECT * FROM metas WHERE usuario_id=%s",
+                (user_id,)
+            )
+
+        data = cursor.fetchall()
+
+    conn.close()
+    return data
+
+
+@app.post("/metas")
+def create_meta(meta: MetaIN, request: Request):
 
     estado = meta.estado
     if meta.progreso == 100:
@@ -157,10 +285,10 @@ def create_meta(meta: MetaIN):
     conn = get_connection()
     with conn.cursor() as cursor:
         cursor.execute("""
-        INSERT INTO metas
-        (usuario_id,categoria_id,titulo,descripcion,progreso,estado,fecha_inicio,fecha_limite)
-        VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
-        """,(
+            INSERT INTO metas
+            (usuario_id,categoria_id,titulo,descripcion,progreso,estado,fecha_inicio,fecha_limite)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+        """, (
             meta.usuario_id,
             meta.categoria_id,
             meta.titulo,
@@ -173,29 +301,34 @@ def create_meta(meta: MetaIN):
 
     conn.commit()
     conn.close()
-    return {"mensaje":"Meta creada"}
+    return {"mensaje": "Meta creada"}
 
-# ======================
-# PUT
-# ======================
-@app.put("/metas/{id}", response_model=Mensaje)
-def replace_meta(id: int, meta: MetaIN):
+
+@app.put("/metas/{id}")
+def update_meta(id: int, meta: MetaIN, request: Request):
+
+    user_id = request.state.user_id
+    rol = request.state.rol
 
     conn = get_connection()
     with conn.cursor() as cursor:
 
-        cursor.execute("SELECT * FROM metas WHERE id=%s",(id,))
-        if not cursor.fetchone():
-            conn.close()
-            raise HTTPException(status_code=404, detail="No existe")
+        cursor.execute("SELECT * FROM metas WHERE id=%s", (id,))
+        existing = cursor.fetchone()
+
+        if not existing:
+            raise HTTPException(404, "No existe")
+
+        if rol != "admin" and existing["usuario_id"] != user_id:
+            raise HTTPException(403, "No autorizado")
 
         estado = meta.estado
         if meta.progreso == 100:
             estado = "completado"
 
         cursor.execute("""
-        UPDATE metas
-        SET usuario_id=%s,
+            UPDATE metas SET
+            usuario_id=%s,
             categoria_id=%s,
             titulo=%s,
             descripcion=%s,
@@ -203,8 +336,8 @@ def replace_meta(id: int, meta: MetaIN):
             estado=%s,
             fecha_inicio=%s,
             fecha_limite=%s
-        WHERE id=%s
-        """,(
+            WHERE id=%s
+        """, (
             meta.usuario_id,
             meta.categoria_id,
             meta.titulo,
@@ -218,89 +351,29 @@ def replace_meta(id: int, meta: MetaIN):
 
     conn.commit()
     conn.close()
-    return {"mensaje":"Meta reemplazada"}
+    return {"mensaje": "Actualizada"}
 
-# ======================
-# PATCH
-# ======================
-@app.patch("/metas/{id}", response_model=Mensaje)
-def update_meta(id: int, meta: MetaUpdate):
+
+@app.delete("/metas/{id}")
+def delete_meta(id: int, request: Request):
+
+    user_id = request.state.user_id
+    rol = request.state.rol
 
     conn = get_connection()
     with conn.cursor() as cursor:
 
-        cursor.execute("SELECT * FROM metas WHERE id=%s",(id,))
-        existing = cursor.fetchone()
+        cursor.execute("SELECT * FROM metas WHERE id=%s", (id,))
+        meta = cursor.fetchone()
 
-        if not existing:
-            conn.close()
-            raise HTTPException(status_code=404, detail="No existe")
+        if not meta:
+            raise HTTPException(404, "No existe")
 
-        update_data = meta.dict(exclude_unset=True)
+        if rol != "admin" and meta["usuario_id"] != user_id:
+            raise HTTPException(403, "No autorizado")
 
-        if "progreso" in update_data and update_data["progreso"] == 100:
-            update_data["estado"] = "completado"
-
-        fields = []
-        values = []
-
-        for k,v in update_data.items():
-            fields.append(f"{k}=%s")
-            values.append(v)
-
-        if not fields:
-            conn.close()
-            return {"mensaje":"Nada que actualizar"}
-
-        values.append(id)
-
-        sql = f"UPDATE metas SET {', '.join(fields)} WHERE id=%s"
-        cursor.execute(sql, tuple(values))
+        cursor.execute("DELETE FROM metas WHERE id=%s", (id,))
 
     conn.commit()
     conn.close()
-    return {"mensaje":"Actualizada parcialmente"}
-
-# ======================
-# DELETE
-# ======================
-@app.delete("/metas/{id}", response_model=Mensaje)
-def delete_meta(id: int):
-
-    conn = get_connection()
-    with conn.cursor() as cursor:
-
-        cursor.execute("SELECT id FROM metas WHERE id=%s",(id,))
-        if not cursor.fetchone():
-            conn.close()
-            raise HTTPException(status_code=404, detail="No existe")
-
-        cursor.execute("DELETE FROM metas WHERE id=%s",(id,))
-
-    conn.commit()
-    conn.close()
-    return {"mensaje":"Eliminada"}
-
-# ======================
-# LOGIN
-# ======================
-@app.post("/login")
-def login(data: Login):
-
-    conn = get_connection()
-    with conn.cursor() as cursor:
-        cursor.execute(
-            "SELECT id, nombre, rol FROM usuarios WHERE email=%s AND password=%s",
-            (data.email, data.password)
-        )
-        user = cursor.fetchone()
-
-    conn.close()
-
-    if not user:
-        raise HTTPException(status_code=401, detail="Credenciales incorrectas")
-
-    return {
-        "mensaje": "Login correcto",
-        "usuario": user
-    }
+    return {"mensaje": "Eliminada"}
