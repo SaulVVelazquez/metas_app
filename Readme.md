@@ -1,148 +1,77 @@
-#  Metas API
+# Metas API
 
 API REST desarrollada con FastAPI para la gestión de metas personales. Permite realizar operaciones CRUD, autenticación de usuarios y consultas avanzadas mediante relaciones en base de datos.
 
 ---
 
-## Descripción
+##  Descripción
 
 Esta API permite a los usuarios:
 
-* Crear metas personales
-* Consultar metas
-* Actualizar metas (total o parcialmente)
-* Eliminar metas
-* Autenticarse mediante login
-* Consultar información combinada mediante JOIN
+- Crear, consultar, actualizar y eliminar metas personales
+- Autenticarse mediante login
+- Consultar información combinada mediante JOIN
 
-El proyecto está diseñado siguiendo buenas prácticas de desarrollo backend, utilizando validaciones, manejo de errores y separación de responsabilidades.
+El proyecto sigue buenas prácticas de desarrollo backend con validaciones, manejo de errores y separación de responsabilidades.
 
 ---
 
 ##  Tecnologías utilizadas
 
-* Python 3.14.4
-* FastAPI
-* MySQL
-* PyMySQL
-* Pydantic
-* XAMPP (para servidor MySQL)
+- Python 3.14.4
+- FastAPI
+- MySQL
+- PyMySQL
+- Pydantic
+- XAMPP
 
 ---
 
-##  Requisitos
+##  Requisitos previos
 
-Antes de ejecutar el proyecto, asegúrate de tener:
-
-* Python 3.14.4 instalado
-* XAMPP en ejecución (Apache y MySQL activos)
-* MySQL corriendo en localhost
-* Archivo `requirements.txt`
+- Python 3.14.4 instalado
+- XAMPP en ejecución (Apache y MySQL activos)
+- Archivo `requirements.txt`
 
 ---
 
-## Instalación
+##  Instalación rápida
 
-### 1. Clonar repositorio
-
-```bash id="n9hr3y"
+```bash
 git clone https://github.com/SaulVVelazquez/metas_app.git
 cd metas_app
-```
-
----
-
-### 2. Crear entorno virtual (opcional)
-
-```bash id="2k7qsu"
 python -m venv venv
 venv\Scripts\activate
-```
-
----
-
-### 3. Instalar dependencias
-
-```bash id="6c8l5r"
 pip install -r requirements.txt
 ```
 
 ---
 
-### 4. Configurar base de datos
+##  Configuración de base de datos
 
-En el proyecto se incluye un archivo:
-
-```id="8t3o6u"
-base.sql
-```
-
-Este archivo contiene:
-
-* Creación de la base de datos `metas_app`
-* Creación de tablas (`usuarios`, `categorias`, `metas`)
-* Datos de prueba (seed)
-
-👉 Ejecuta este archivo en MySQL (phpMyAdmin o consola)
+Ejecuta el archivo `base.sql` en MySQL (phpMyAdmin o consola) para:
+- Crear la base de datos `metas_app`
+- Crear tablas (`usuarios`, `categorias`, `metas`)
+- Cargar datos de prueba
 
 ---
 
-### 5. Ejecutar servidor
+##  Iniciar servidor
 
-```bash id="9r4sn1"
+```bash
 uvicorn app:app --reload
 ```
 
----
-
-##  Acceso
-
-* API:
-
-```id="c3d5jq"
-http://localhost:8000
-```
-
-* Documentación interactiva (Swagger):
-
-```
-http://localhost:8000/docs
-```
-
----
-
-##  Base de datos
-
-Nombre:
-
-```
-metas_app
-```
-
-### Tablas principales:
-
-* usuarios
-* categorias
-* metas
-
-### Relaciones:
-
-* Un usuario puede tener múltiples metas
-* Una categoría puede contener múltiples metas
+**Acceso:**
+- **API:** http://localhost:8000
+- **Swagger:** http://localhost:8000/docs
 
 ---
 
 ##  Autenticación
 
-### Endpoint:
-
-```
-POST /login
-```
-
-### Ejemplo:
-
-```json id="q5m2qf"
+**POST** `/login`
+```json
 {
   "email": "prueba@email.com",
   "password": "123456"
@@ -151,88 +80,74 @@ POST /login
 
 ---
 
-##  Endpoints
+##  Endpoints principales
 
-###  Metas
-
-| Método | Endpoint            | Descripción             |
-| ------ | ------------------- | ----------------------- |
-| GET    | /metas              | Obtener todas las metas |
-| GET    | /metas/{id}         | Obtener meta por ID     |
-| GET    | /metas/usuario/{id} | Metas por usuario       |
-| GET    | /metas-detalle      | Consulta con JOIN       |
-| POST   | /metas              | Crear meta              |
-| PUT    | /metas/{id}         | Reemplazar meta         |
-| PATCH  | /metas/{id}         | Actualizar parcialmente |
-| DELETE | /metas/{id}         | Eliminar meta           |
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | /metas | Obtener todas |
+| GET | /metas/{id} | Obtener por ID |
+| POST | /metas | Crear |
+| PUT | /metas/{id} | Reemplazar |
+| PATCH | /metas/{id} | Actualizar parcialmente |
+| DELETE | /metas/{id} | Eliminar |
 
 ---
 
-## Ejemplo de consumo
+##  Esquema de base de datos
 
-### GET
+La base de datos `metas_app` está compuesta por tres tablas principales vinculadas mediante llaves foráneas.
 
-```bash id="rjw7sx"
-curl http://localhost:8000/metas
-```
+### 1. Tabla: `usuarios`
+Almacena la información de acceso y perfil de los usuarios del sistema.
 
----
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| id | Integer (PK, Auto-increment) | Identificador único |
+| nombre | Varchar | Nombre completo |
+| email | Varchar | Correo electrónico único |
+| password | Varchar | Contraseña encriptada |
+| rol | Varchar | Permisos (`admin` o `user`) |
 
-### POST
+### 2. Tabla: `categorias`
+Clasifica las metas para normalización de datos.
 
-```bash id="r5y64q"
-curl -X POST http://localhost:8000/metas \
--H "Content-Type: application/json" \
--d '{
-  "usuario_id":1,
-  "categoria_id":1,
-  "titulo":"Nueva meta",
-  "descripcion":"Ejemplo",
-  "progreso":0,
-  "estado":"pendiente"
-}'
-```
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| id | Integer (PK, Auto-increment) | Identificador único |
+| nombre | Varchar | Nombre de categoría (ej. "Personal", "Laboral") |
 
----
+### 3. Tabla: `metas`
+Contiene los objetivos de cada usuario.
 
-##  Características
-
-* CRUD completo
-* Validación de datos con Pydantic
-* Manejo de errores HTTP
-* Consultas avanzadas con JOIN
-* API REST estructurada
-* Código organizado
-
----
-
-## 🚀 Posibles mejoras futuras
-
-* Implementación de JWT
-* Middleware de autenticación
-* Paginación de resultados
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| id | Integer (PK, Auto-increment) | Identificador único |
+| usuario_id | Integer (FK) | Referencia a `usuarios` |
+| categoria_id | Integer (FK) | Referencia a `categorias` |
+| titulo | Varchar | Nombre descriptivo |
+| descripcion | Text | Detalle de la meta |
+| progreso | Integer | Porcentaje (0-100) |
+| estado | Varchar | Estado (`pendiente`, `en progreso`, `completado`) |
+| fecha_inicio | Date | Inicio del objetivo |
+| fecha_limite | Date | Fecha máxima de cumplimiento |
 
 ---
 
-## 📌 Notas
+##  Relaciones y cardinalidad
 
-Este proyecto fue desarrollado como parte de una prueba técnica para demostrar habilidades en desarrollo backend con FastAPI, bases de datos relacionales y diseño de APIs.
+- **Usuarios → Metas (1:N):** Un usuario puede tener múltiples metas
+- **Categorías → Metas (1:N):** Una categoría puede clasificar múltiples metas
 
-##  Archivo de prueba de conexión
+---
 
-El proyecto incluye un archivo adicional:
+##  Mejoras futuras
 
-```bash
-test.py
-```
+- Implementación de JWT
+- Middleware de autenticación
+- Paginación de resultados
 
-Este archivo se utilizó para verificar la conexión a la base de datos MySQL de forma independiente antes de integrar la lógica en la API.
+---
 
-Permite validar:
+##  Notas
 
-* Conexión correcta a la base de datos
-* Credenciales de acceso
-* Disponibilidad del servidor MySQL (XAMPP)
-
-Este archivo es útil durante el desarrollo para pruebas y depuración.
-
+Proyecto desarrollado como prueba técnica. Incluye `test.py` para verificar conexión a MySQL.
