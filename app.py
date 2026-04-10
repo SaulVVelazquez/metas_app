@@ -262,12 +262,22 @@ def get_metas(request: Request):
     with conn.cursor() as cursor:
 
         if rol == "admin":
-            cursor.execute("SELECT * FROM metas")
+            cursor.execute("""
+                SELECT 
+                    m.*,
+                    u.nombre AS nombre_usuario
+                FROM metas m
+                INNER JOIN usuarios u ON m.usuario_id = u.id
+            """)
         else:
-            cursor.execute(
-                "SELECT * FROM metas WHERE usuario_id=%s",
-                (user_id,)
-            )
+            cursor.execute("""
+                SELECT 
+                    m.*,
+                    u.nombre AS nombre_usuario
+                FROM metas m
+                INNER JOIN usuarios u ON m.usuario_id = u.id
+                WHERE m.usuario_id = %s
+            """, (user_id,))
 
         data = cursor.fetchall()
 
