@@ -284,34 +284,63 @@ def get_metas(request: Request):
     conn.close()
     return data
 
-
 @app.post("/metas")
 def create_meta(meta: MetaIN, request: Request):
-
-    estado = meta.estado
-    if meta.progreso == 100:
-        estado = "completado"
+    # Validación de seguridad: el usuario logueado es el dueño
+    if request.state.rol != "admin" and meta.usuario_id != request.state.user_id:
+        raise HTTPException(status_code=403, detail="No autorizado para crear metas a otro usuario")
 
     conn = get_connection()
-    with conn.cursor() as cursor:
-        cursor.execute("""
-            INSERT INTO metas
-            (usuario_id,categoria_id,titulo,descripcion,progreso,estado,fecha_inicio,fecha_limite)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
-        """, (
-            meta.usuario_id,
-            meta.categoria_id,
-            meta.titulo,
-            meta.descripcion,
-            meta.progreso,
-            estado,
-            meta.fecha_inicio,
-            meta.fecha_limite
-        ))
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO metas 
+                (usuario_id, categoria_id, titulo, descripcion, progreso, estado, fecha_inicio, fecha_limite)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                request.state.user_id, # Usamos el ID del middleware por seguridad
+                meta.categoria_id or 1,
+                meta.titulo,
+                meta.descripcion,
+                meta.progreso,
+                meta.estado,
+                meta.fecha_inicio,
+                meta.fecha_limite
+            ))
+        conn.commit()
+        return {"mensaje": "Meta creada con éxito"}
+    except Exception as e:
+        print(f"Error DB: {e}")
+        raise HTTPException(status_code=500, detail="Error interno al guardar en la base de datos")
+    finally:
+        conn.close()
+# @app.post("/metas")
+# def create_meta(meta: MetaIN, request: Request):
 
-    conn.commit()
-    conn.close()
-    return {"mensaje": "Meta creada"}
+#     estado = meta.estado
+#     if meta.progreso == 100:
+#         estado = "completado"
+
+#     conn = get_connection()
+#     with conn.cursor() as cursor:
+#         cursor.execute("""
+#             INSERT INTO metas
+#             (usuario_id,categoria_id,titulo,descripcion,progreso,estado,fecha_inicio,fecha_limite)
+#             VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+#         """, (
+#             meta.usuario_id,
+#             meta.categoria_id,
+#             meta.titulo,
+#             meta.descripcion,
+#             meta.progreso,
+#             estado,
+#             meta.fecha_inicio,
+#             meta.fecha_limite
+#         ))
+
+#     conn.commit()
+#     conn.close()
+#     return {"mensaje": "Meta creada"}
 
 
 @app.put("/metas/{id}")

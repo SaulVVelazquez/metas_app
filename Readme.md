@@ -91,6 +91,14 @@ uvicorn app:app --reload
 | PATCH | /metas/{id} | Actualizar parcialmente |
 | DELETE | /metas/{id} | Eliminar |
 
+- `POST /register`: Registro de usuarios (Hasheo de password con Bcrypt).
+- `POST /login`: Genera respuesta con headers de sesión.
+- `GET /metas`: Listado dinámico (Admin ve todo / User ve lo suyo).
+- `POST /metas`: Creación con validación de integridad 3NF.
+- `PUT /metas/{id}`: Actualización de progreso y estados.
+- `DELETE /metas/{id}`: Borrado físico de registros.
+
+*Nota: Todas las rutas (excepto login/register) requieren headers `x-user-id` y `x-rol`.*
 ---
 
 ##  Esquema de base de datos
