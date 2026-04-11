@@ -1,32 +1,28 @@
-# Metas API
+# Metas API 
 
-API REST desarrollada con FastAPI para la gestión de metas personales. Incluye operaciones CRUD, autenticación de usuarios y consultas avanzadas mediante relaciones en base de datos.
-
----
-
-## Descripción
-
-Esta API permite a los usuarios:
-
-- Crear, consultar, actualizar y eliminar metas personales
-- Autenticarse mediante credenciales
-- Consultar información combinada mediante JOINs
-- Gestionar roles de administrador y usuario
-
-El proyecto implementa buenas prácticas de desarrollo backend: validaciones robustas, manejo de errores y separación clara de responsabilidades.
+API REST robusta desarrollada con **FastAPI** para la gestión de metas y objetivos.
+Implementa una arquitectura relacional en **MySQL**, seguridad mediante hashing de contraseñas y un sistema de control de acceso basado en roles (**RBAC**).
 
 ---
 
-## Tecnologías
+##  Características Técnicas
 
-- Python 3.10+
-- FastAPI
-- MySQL
-- PyMySQL
-- Pydantic
-- XAMPP
+*  **Autenticación Basada en Headers**: Validación mediante `x-user-id` y `x-rol`.
+*  **Seguridad**: Hashing de contraseñas con **bcrypt** (salt automático).
+*  **Middleware Global**: Procesamiento de peticiones para inyectar el estado del usuario.
+* **Lógica de Negocio**: Actualización automática de estados basada en el progreso (0–100%).
+*  **Consultas Optimizadas**: Uso de `INNER JOIN` y `LEFT JOIN` para obtener datos completos en una sola petición.
+##  Tecnologías y Librerías
+
+* **Python** 3.10+
+* **FastAPI**: Framework web de alto rendimiento
+* **PyMySQL**: Conector de base de datos
+* **Pydantic**: Validación de datos (Data Integrity)
+* **Bcrypt**: Encriptación de seguridad
+* **MySQL / XAMPP**: Motor de base de datos relacional
 
 ---
+
 
 ## Requisitos previos
 
@@ -50,59 +46,17 @@ pip install -r requirements.txt
 
 ## Configuración de base de datos
 
-Ejecuta `base.sql` en MySQL (phpMyAdmin o consola):
-
+Importa el archivo `base.sql` en tu servidor MySQL.
 ```sql
 -- base.sql contiene:
 -- • Base de datos: metas_app
 -- • Tablas: usuarios, categorias, metas
--- • Datos de prueba
 ```
+### Estructura de tablas:
 
----
-
-## Iniciar servidor
-
-```bash
-uvicorn app:app --reload
-```
-
-**Acceso:**
-- API: `http://localhost:8000`
-- Swagger UI: `http://localhost:8000/docs`
-
----
-
-## Autenticación
-
-**POST** `/login`
-
-```json
-{
-  "email": "prueba@email.com",
-  "password": "123456"
-}
-```
-
-Headers requeridos en todas las rutas (excepto `/login` y `/register`):
-- `x-user-id`: ID del usuario
-- `x-rol`: Rol del usuario (`admin` o `user`)
-
----
-
-## Endpoints principales
-
-| Método | Endpoint | Descripción |
-|--------|----------|-------------|
-| POST | `/register` | Registro con hash Bcrypt |
-| POST | `/login` | Genera headers de sesión |
-| GET | `/metas` | Listado (dinámico por rol) |
-| GET | `/metas/{id}` | Obtener por ID |
-| POST | `/metas` | Crear con validación 3NF |
-| PUT | `/metas/{id}` | Reemplazar |
-| PATCH | `/metas/{id}` | Actualizar parcialmente |
-| DELETE | `/metas/{id}` | Eliminar |
-
+* **usuarios**: Gestión de perfiles y roles
+* **categorias**: Diccionario de etiquetas para metas
+* **metas**: Tabla principal con llaves foráneas hacia usuarios y categorías
 ---
 
 ## Esquema de base de datos
@@ -147,15 +101,76 @@ Headers requeridos en todas las rutas (excepto `/login` y `/register`):
 
 ---
 
-## Próximas mejoras
+La API utiliza un middleware personalizado que intercepta cada llamada (excepto rutas públicas) para verificar los headers de identidad:
 
-- Implementación JWT
-- Middleware de autenticación centralizado
-- Paginación de resultados
-- Documentación OpenAPI mejorada
+```python id="p8s9dl"
+# Inyección de identidad en el estado de la petición
+request.state.user_id = int(user_id)
+request.state.rol = rol
+```
+
+### Rutas Públicas
+
+* `/`
+* `/login`
+* `/register`
+* `/docs`
+* `/openapi.json`
+
+##  Endpoints Actualizados
+
+###  Autenticación e Identidad
+
+| Método | Endpoint    | Descripción                                     |
+| ------ | ----------- | ----------------------------------------------- |
+| POST   | `/register` | Crea usuario con password hasheado              |
+| POST   | `/login`    | Valida credenciales y retorna headers de sesión |
+| GET    | `/me`       | Retorna el perfil del usuario autenticado       |
 
 ---
+
+###  Gestión de Metas
+
+| Método | Endpoint      | Descripción                                       |
+| ------ | ------------- | ------------------------------------------------- |
+| GET    | `/metas`      | Lista metas (Admin ve todas, User solo las suyas) |
+| POST   | `/metas`      | Crea meta vinculada al ID del header              |
+| PUT    | `/metas/{id}` | Actualización completa con validación de dueño    |
+| DELETE | `/metas/{id}` | Eliminación física de registros                   |
+
+---
+
+###  Administración y Dashboard (Solo Admin)
+
+| Método | Endpoint         | Descripción                       |
+| ------ | ---------------- | --------------------------------- |
+| GET    | `/stats`         | Estadísticas globales del sistema |
+| GET    | `/usuarios`      | Listado de usuarios registrados   |
+| DELETE | `/usuarios/{id}` | Remover cuentas del sistema       |
+| POST   | `/categorias`    | Crear nuevas categorías dinámicas |
+
+##  Reglas de Validación (Pydantic)
+
+*  **Email**: Formato válido (`EmailStr`)
+*  **Password**: Mínimo 6 caracteres
+*  **Progreso**: Entero entre 0 y 100
+*  **Fechas**: `fecha_inicio` no puede ser mayor a `fecha_limite`
+
+---
+
+##  Ejecución
+
+Para iniciar el servidor en modo desarrollo:
+
+```bash id="r3n8tx"
+uvicorn main:app --reload
+```
+
+La documentación interactiva estará disponible en:
+👉 http://localhost:8000/docs
 
 ## Notas
 
 Proyecto técnico con validación de conexión MySQL en `test.py`.
+
+
