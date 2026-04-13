@@ -100,10 +100,10 @@ async def auth(request: Request, call_next):
 
     user_id = request.headers.get("x-user-id")
     rol = request.headers.get("x-rol")
-    
+
     if not user_id or not rol:
         return JSONResponse(status_code=401, content={"detail": "Falta autenticación"})
-    
+
     request.state.user_id = int(user_id)
     request.state.rol = rol
     return await call_next(request)
@@ -140,7 +140,7 @@ def register(user: UsuarioIN):
 
     return {"mensaje": "Usuario creado correctamente"}
 
-@app.post("/login", tags=["Auth"], summary="Login usuario", description="Devuelve headers necesarios para autenticación.")
+@app.post("/login", tags=["Auth"], summary="Login usuario", description=" login usuario. Devuelve headers necesarios para autenticación.")
 def login(data: Login):
     conn = get_connection()
 
@@ -162,7 +162,11 @@ def login(data: Login):
 # CATEGORIAS
 # ======================
 @app.get("/categorias", tags=["Categorias"], summary="Obtener categorías", description="Roles permitidos: admin, user. Headers requeridos: x-user-id, x-rol")
-def get_categorias():
+def get_categorias(
+    request: Request,
+    x_user_id: Optional[str] = Header(None),
+    x_rol: Optional[str] = Header(None)
+):
     conn = get_connection()
 
     with conn.cursor() as cursor:
@@ -173,11 +177,17 @@ def get_categorias():
 
     return data
 
+
 @app.post("/categorias", tags=["Categorias"])
-def create_categoria(cat: CategoriaIN, request: Request):
+def create_categoria(
+    cat: CategoriaIN,
+    request: Request,
+    x_user_id: Optional[str] = Header(None),
+    x_rol: Optional[str] = Header(None)
+):
     if request.state.rol != "admin":
         raise HTTPException(403, "Solo los administradores pueden crear categorías")
-    
+
     conn = get_connection()
     with conn.cursor() as cursor:
         cursor.execute("INSERT INTO categorias (nombre) VALUES (%s)", (cat.nombre,))
@@ -189,7 +199,11 @@ def create_categoria(cat: CategoriaIN, request: Request):
 # METAS
 # ======================
 @app.get("/metas", tags=["Metas"], summary="Obtener metas", description="admin → todas las metas, user → solo sus metas. Headers requeridos: x-user-id, x-rol")
-def get_metas(request: Request):
+def get_metas(
+    request: Request,
+    x_user_id: Optional[str] = Header(None),
+    x_rol: Optional[str] = Header(None)
+):
     user_id = request.state.user_id
     rol = request.state.rol
 
@@ -218,8 +232,14 @@ def get_metas(request: Request):
 
     return data
 
+
 @app.post("/metas", tags=["Metas"], summary="Crear meta", description="El usuario_id se asigna automáticamente desde headers.")
-def create_meta(meta: MetaIN, request: Request):
+def create_meta(
+    meta: MetaIN,
+    request: Request,
+    x_user_id: Optional[str] = Header(None),
+    x_rol: Optional[str] = Header(None)
+):
     try:
         usuario_id = request.state.user_id
 
@@ -255,8 +275,15 @@ def create_meta(meta: MetaIN, request: Request):
         print(f"ERROR EN EL BACKEND: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.put("/metas/{id}", tags=["Metas"], summary="Actualizar meta", description="admin: todas las metas, user: solo sus metas")
-def update_meta(id: int, meta: MetaIN, request: Request):
+def update_meta(
+    id: int,
+    meta: MetaIN,
+    request: Request,
+    x_user_id: Optional[str] = Header(None),
+    x_rol: Optional[str] = Header(None)
+):
     user_id = request.state.user_id
     rol = request.state.rol
 
@@ -277,24 +304,28 @@ def update_meta(id: int, meta: MetaIN, request: Request):
                 SET categoria_id=%s, titulo=%s, descripcion=%s, progreso=%s,
                     estado=%s, fecha_inicio=%s, fecha_limite=%s
                 WHERE id=%s AND usuario_id=%s
-            """, (meta.categoria_id, meta.titulo, meta.descripcion, meta.progreso,
-                  estado, meta.fecha_inicio, meta.fecha_limite, id, user_id))
+            """, (meta.categoria_id, meta.titulo, meta.descripcion, meta.progreso,estado, meta.fecha_inicio, meta.fecha_limite, id, user_id))
         else:
             cursor.execute("""
                 UPDATE metas
                 SET categoria_id=%s, titulo=%s, descripcion=%s, progreso=%s,
                     estado=%s, fecha_inicio=%s, fecha_limite=%s
                 WHERE id=%s
-            """, (meta.categoria_id, meta.titulo, meta.descripcion, meta.progreso,
-                  estado, meta.fecha_inicio, meta.fecha_limite, id))
+            """, (meta.categoria_id, meta.titulo, meta.descripcion, meta.progreso,estado, meta.fecha_inicio, meta.fecha_limite, id))
 
     conn.commit()
     conn.close()
 
     return {"mensaje": "Meta actualizada correctamente"}
 
+
 @app.delete("/metas/{id}", tags=["Metas"], summary="Eliminar meta")
-def delete_meta(id: int, request: Request):
+def delete_meta(
+    id: int,
+    request: Request,
+    x_user_id: Optional[str] = Header(None),
+    x_rol: Optional[str] = Header(None)
+):
     user_id = request.state.user_id
     rol = request.state.rol
 
@@ -315,7 +346,11 @@ def delete_meta(id: int, request: Request):
 # USUARIOS (ADMIN)
 # ======================
 @app.get("/usuarios", tags=["Usuarios"], summary="Obtener usuarios", description="Solo admin")
-def get_users(request: Request):
+def get_users(
+    request: Request,
+    x_user_id: Optional[str] = Header(None),
+    x_rol: Optional[str] = Header(None)
+):
     if request.state.rol != "admin":
         raise HTTPException(403, "Solo admin")
 
@@ -329,8 +364,14 @@ def get_users(request: Request):
 
     return data
 
+
 @app.delete("/usuarios/{id}", tags=["Usuarios"], summary="Eliminar usuario", description="Solo admin")
-def delete_user(id: int, request: Request):
+def delete_user(
+    id: int,
+    request: Request,
+    x_user_id: Optional[str] = Header(None),
+    x_rol: Optional[str] = Header(None)
+):
     if request.state.rol != "admin":
         raise HTTPException(403, "Solo admin")
 
@@ -348,7 +389,11 @@ def delete_user(id: int, request: Request):
 # PERFIL USUARIO ACTUAL
 # ======================
 @app.get("/me", tags=["Usuarios"], summary="Obtener usuario actual", description="Devuelve información del usuario autenticado")
-def get_me(request: Request):
+def get_me(
+    request: Request,
+    x_user_id: Optional[str] = Header(None),
+    x_rol: Optional[str] = Header(None)
+):
     conn = get_connection()
 
     with conn.cursor() as cursor:
@@ -363,7 +408,11 @@ def get_me(request: Request):
 # STATS DASHBOARD
 # ======================
 @app.get("/stats", tags=["Dashboard"], summary="Estadísticas del sistema", description="admin: globales, user: personales")
-def stats(request: Request):
+def stats(
+    request: Request,
+    x_user_id: Optional[str] = Header(None),
+    x_rol: Optional[str] = Header(None)
+):
     user_id = request.state.user_id
     rol = request.state.rol
 

@@ -98,7 +98,9 @@ Importa el archivo `base.sql` en tu servidor MySQL.
 
 - **Usuarios → Metas**: 1:N (un usuario, múltiples metas)
 - **Categorías → Metas**: 1:N (una categoría, múltiples metas)
+## Esquema de Base de Datos (ERD)
 
+![Diagrama de Base de Datos](./db_schema.png)
 ---
 
 La API utiliza un middleware personalizado que intercepta cada llamada (excepto rutas públicas) para verificar los headers de identidad:
